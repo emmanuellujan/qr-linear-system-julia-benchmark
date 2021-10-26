@@ -1,4 +1,5 @@
 using LinearAlgebra
+using StaticArrays
 using Octavian
 using .Threads
 
@@ -16,45 +17,33 @@ using .Threads
 # Outputs: Q      The orthogonal matrix: Q
 #          R      The upper triangular matrix: R
 
-
-function MGS2( a::Int64, b::Int64, m::Int64, n::Int64,
-               Q::Matrix{Float64}, R::Matrix{Float64})
+function MGS(A::Matrix{Float64})
+    m, n = size(A)
+    Q = copy(A)
+    R = zeros(Float64, n, n)
     nn = 0.0
+    aux1 = SMatrix{m, n, Float64, m*n}
     @views for j = 1:n
         nn = norm(Q[:,j])
         R[j,j] = nn
         Q[:,j] /= nn
 
         aux1 = reshape(Q[:,j], :, 1)
-        
         aux2 = matmul(Q[:,j]', Q[:,j+1:n])
-        #aux2 = Q[a:b,j]' * Q[a:b,j+1:n]
- 
+        #aux2 = matmul(transpose(Q[:,j]), Q[:,j+1:n])
+
         R[j,j+1:n] = aux2
 
-        Q[:,j+1:n] -= matmul(aux1, aux2)
-        #Q[a:b,j+1:n] -= aux1 * aux2
-    end
-end
+        Q[:,j+1:n] .-= aux1 .* aux2
+        #Q[:,j+1:n] .-= matmul(aux1, aux2)
 
-function MGS(A::Matrix{Float64})
-    m, n = size(A)
-    nn = 0.0
-    Q = copy(A)
-    R = zeros(Float64, n, n)
-    MGS2(1, 1, m, n,  Q, R)
-    #nt = Threads.nthreads()
-    #half = floor(Int64, m / 2)
-    #t1 = Threads.@spawn MGS2(1, half, m, n,  Q, R)
-    #t2 = Threads.@spawn MGS2(half+1, m, m, n,  Q, R)
-    #fetch(t1)
-    #fetch(t2)
+    end
     return Q, R
 end
 
 
 m = 100000
-n = 50
+n = 100
 A = rand(m, n)
 B = rand(m, 1)
 
@@ -62,9 +51,9 @@ B = rand(m, 1)
 X1 = A \ B
 end
 
-#@time begin
-#X2 = qr(A, Val(true)) \ B
-#end
+@time begin
+X2 = qr(A, Val(true)) \ B
+end
 
 @time begin
 Q3, R3 = MGS(A)
@@ -72,6 +61,6 @@ X3 = R3 \ matmul(transpose(Q3), B)
 end
 ;
 
-#println(maximum(X1 - X2))
+println(maximum(X1 - X2))
 println(maximum(X1 - X3))
 
